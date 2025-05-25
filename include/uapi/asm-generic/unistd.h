@@ -851,9 +851,12 @@ __SYSCALL(__NR_listxattrat, sys_listxattrat)
 __SYSCALL(__NR_removexattrat, sys_removexattrat)
 #define __NR_open_tree_attr 467
 __SYSCALL(__NR_open_tree_attr, sys_open_tree_attr)
+#define __NR_read_mc504 468
+__SYSCALL(__NR_read_mc504, sys_read_mc504)
 
 #undef __NR_syscalls
-#define __NR_syscalls 468
+#define __NR_syscalls 469 //aumentei o valor para replicar a mudança no systema
+
 
 /*
  * 32 bit systems traditionally used different

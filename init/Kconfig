@@ -2101,6 +2101,12 @@ config ARCH_HAS_PREPARE_SYNC_CORE_CMD
 config ARCH_HAS_SYNC_CORE_BEFORE_USERMODE
 	bool
 
+#MC504
+config READ_MC504_SYSCALL
+	bool
+	help
+		Ativa a chamada de sistema educativa "read_mc504()", que lê uma string do terminal e, ao invés de terminar com '\0', insere "Test MC504\0" ao final do vetor. Esta syscall serve apenas para fins didáticos na disciplina MC504.
+
 # It may be useful for an architecture to override the definitions of the
 # SYSCALL_DEFINE() and __SYSCALL_DEFINEx() macros in <linux/syscalls.h>
 # and the COMPAT_ variants in <linux/compat.h>, in particular to use a
