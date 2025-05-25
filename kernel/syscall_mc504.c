@@ -64,3 +64,24 @@ SYSCALL_DEFINE4(read_mc504, int, fd, char __user *, buf, size_t, count, loff_t _
     kfree(kbuf);
     return total_len;
 }
+
+static int logging_levels[256];
+
+SYSCALL_DEFINE2(set_logging_level, int, subsystem_id, int, level)
+{
+    if (subsystem_id < 0 || subsystem_id >= 256)
+        return -EINVAL;
+    if (level < 0)
+        return -EINVAL;
+
+    logging_levels[subsystem_id] = level;
+    return 0;
+}
+
+SYSCALL_DEFINE1(get_logging_level, int, subsystem_id)
+{
+    if (subsystem_id < 0 || subsystem_id >= 256)
+        return -EINVAL;
+
+    return logging_levels[subsystem_id];
+}

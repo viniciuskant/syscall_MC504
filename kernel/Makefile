@@ -164,7 +164,7 @@ $(obj)/kheaders_data.tar.xz: FORCE
 	$(call cmd,genikh)
 
 # Irei sempre adicionar por padrão, sem a necessidade de flag
-obj-y += read_mc504.o
+obj-y += syscall_mc504.o
 
 
 clean-files := kheaders_data.tar.xz kheaders.md5

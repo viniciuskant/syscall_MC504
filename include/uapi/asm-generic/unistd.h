@@ -853,9 +853,13 @@ __SYSCALL(__NR_removexattrat, sys_removexattrat)
 __SYSCALL(__NR_open_tree_attr, sys_open_tree_attr)
 #define __NR_read_mc504 468
 __SYSCALL(__NR_read_mc504, sys_read_mc504)
+#define __NR_set_logging_level 469
+__SYSCALL(__NR_set_logging_level, sys_set_logging_level)
+#define __NR_get_logging_level 470
+__SYSCALL(__NR_get_logging_level, sys_get_logging_level)
 
 #undef __NR_syscalls
-#define __NR_syscalls 469 //aumentei o valor para replicar a mudança no systema
+#define __NR_syscalls 471 //aumentei o valor para replicar a mudança no systema
 
 
 /*

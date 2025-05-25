@@ -1000,6 +1000,9 @@ asmlinkage long sys_uretprobe(void);
 
 //mc504
 asmlinkage long sys_read_mc504(int fd, char __user *buf, size_t count);
+asmlinkage long sys_set_logging_level(int subsystem_id, int level)
+asmlinkage long sys_get_logging_level(int subsystem_id)
+
 
 /* pciconfig: alpha, arm, arm64, ia64, sparc */
 asmlinkage long sys_pciconfig_read(unsigned long bus, unsigned long dfn,
