@@ -76,7 +76,8 @@ ino_t minix_inode_by_name(struct dentry*);
 
 extern const struct inode_operations minix_file_inode_operations;
 extern const struct inode_operations minix_dir_inode_operations;
-extern const struct file_operations minix_file_operations;
+extern const struct file_operations 
+;
 extern const struct file_operations minix_dir_operations;
 
 static inline struct minix_sb_info *minix_sb(struct super_block *sb)

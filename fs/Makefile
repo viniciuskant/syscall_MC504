@@ -73,6 +73,7 @@ obj-y				+= ramfs/
 obj-$(CONFIG_HUGETLBFS)		+= hugetlbfs/
 obj-$(CONFIG_CODA_FS)		+= coda/
 obj-$(CONFIG_MINIX_FS)		+= minix/
+obj-y                       += mc504fs/ #falta colocar uma macro
 obj-$(CONFIG_FAT_FS)		+= fat/
 obj-$(CONFIG_EXFAT_FS)		+= exfat/
 obj-$(CONFIG_BFS_FS)		+= bfs/
