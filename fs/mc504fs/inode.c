@@ -147,41 +147,63 @@ MODULE_VERSION("0.1");
 static struct inode *mc504fs_get_inode(struct super_block *sb, const struct inode *dir,
                                        umode_t mode, dev_t dev);
 
-static int mc504fs_iterate(struct file *file, struct dir_context *ctx) {
-    struct inode *inode = file_inode(file);
+static int mc504fs_create(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode, bool excl);
 
-    pr_info("mc504fs: iterate called on inode %lu, pos=%lld\n", inode->i_ino, ctx->pos);
+static int mc504fs_iterate(struct file *file, struct dir_context *ctx);
 
-    if (ctx->pos == 0) {
-        if (!dir_emit(ctx, ".", 1, inode->i_ino, DT_DIR))
-            return -ENOMEM;
-        ctx->pos++;
-    }
-
-    if (ctx->pos == 1) {
-        if (!dir_emit(ctx, "..", 2, d_inode(inode->i_sb->s_root->d_parent)->i_ino, DT_DIR))
-            return -ENOMEM;
-        ctx->pos++;
-    }
-
-    return 0;
-}
+static struct dentry *mc504fs_mkdir(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode);
 
 static const struct file_operations mc504fs_file_operations = {
-    .read_iter = generic_file_read_iter,
-    .write_iter = generic_file_write_iter,
+    // ramfs
+    .read_iter		= generic_file_read_iter,
+	.write_iter		= generic_file_write_iter,
     .llseek = generic_file_llseek,
+    .iterate_shared = mc504fs_iterate, // pertende ao file_operations e não a inode_operations
 };
 
-static const struct file_operations mc504fs_dir_operations = {
-    .iterate_shared = mc504fs_iterate,
-    .read = generic_read_dir,
+// usando a ideia do ramfs
+static const struct inode_operations mc504fs_dir_operations = {
+    // .read = generic_read_dir, // é antigo
+    .lookup = simple_lookup,
+    .mkdir = mc504fs_mkdir,
+    .create = mc504fs_create,
+	.link		= simple_link, // peguei do ramfs
+	.rename		= simple_rename,
+    
 };
 
 static const struct inode_operations mc504fs_file_inode_operations = {
     .getattr = simple_getattr,
     .setattr = simple_setattr,
 };
+
+// static int mc504fs_emit_dentry(struct dentry *dentry, void *data) {
+//     struct dir_context *ctx = data;
+//     struct inode *inode = d_inode(dentry);
+
+//     if (!inode)
+//         return 0;  // Skip negative dentries
+
+//     pr_info("mc504fs: emitting child %s (ino=%lu)\n", dentry->d_name.name, inode->i_ino);
+
+//     if (!dir_emit(ctx, dentry->d_name.name, dentry->d_name.len,
+//                   inode->i_ino, DT_UNKNOWN))
+//         return -ENOMEM;
+
+//     ctx->pos++;
+//     return 0;
+// }
+
+static int mc504fs_iterate(struct file *file, struct dir_context *ctx) {
+    // struct dentry *dentry = file->f_path.dentry;
+
+    pr_info("mc504fs: iterate called on inode %lu, pos=%lld\n", file_inode(file)->i_ino, ctx->pos);
+
+    if (!dir_emit_dots(file, ctx))
+        return 0;
+
+    return iterate_dir(file, ctx);
+}
 
 static int mc504fs_create(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode, bool excl) {
     struct inode *inode = mc504fs_get_inode(dir->i_sb, dir, mode, 0);
@@ -192,33 +214,19 @@ static int mc504fs_create(struct mnt_idmap *idmap, struct inode *dir, struct den
 }
 
 static struct dentry *mc504fs_mkdir(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode) {
-    pr_info("Creating directory: %s\n", dentry->d_name.name);
-
-    int ret = mc504fs_create(idmap, dir, dentry, mode | S_IFDIR | 0755, 0);
-    if (ret) {
-        pr_err("Failed to create directory: %s, Error: %d\n", dentry->d_name.name, ret);
-        return ERR_PTR(ret);
-    }
-
-    inc_nlink(dir);
-
-    char *path_buffer = kmalloc(PATH_MAX, GFP_KERNEL);
-    if (!path_buffer) {
-        pr_err("Failed to allocate memory for path buffer\n");
+    struct inode *inode = mc504fs_get_inode(dir->i_sb, dir, S_IFDIR | mode, 0);
+    if (!inode)
         return ERR_PTR(-ENOMEM);
-    }
 
-    char *path = dentry_path_raw(dentry, path_buffer, PATH_MAX);
-    if (IS_ERR(path)) {
-        pr_err("Failed to retrieve absolute path for directory: %s\n", dentry->d_name.name);
-        kfree(path_buffer);
-        return ERR_PTR(PTR_ERR(path));
-    }
-    pr_info("Directory created successfully: %s, Path: %s\n", dentry->d_name.name, path);
+    inc_nlink(dir);  // Incrementa nlink do diretório pai (para o novo subdiretório "..")
 
-    kfree(path_buffer);
-    return NULL; // return dentry;
+    d_instantiate(dentry, inode);
+
+    pr_info("Directory created successfully: %s\n", dentry->d_name.name);
+
+    return NULL;
 }
+
 
 static const struct inode_operations mc504fs_dir_inode_operations = {
     .lookup = simple_lookup,
@@ -226,31 +234,31 @@ static const struct inode_operations mc504fs_dir_inode_operations = {
     .create = mc504fs_create,
 };
 
-static struct inode *mc504fs_get_inode(struct super_block *sb, 
-    const struct inode *dir, umode_t mode, dev_t dev) {
-    struct inode *inode = new_inode(sb); // buscar kernel rcu na internet
-    
-    if (inode) {
-        inode->i_ino = get_next_ino();
-        inode_init_owner(&nop_mnt_idmap, inode, dir, mode);
-        simple_inode_init_ts(inode);
+static struct inode *mc504fs_get_inode(struct super_block *sb, const struct inode *dir, umode_t mode, dev_t dev) {
+    struct inode *inode = new_inode(sb);
+    if (!inode)
+        return NULL;
 
-        // usar o nfsctl.c como referencia
-        switch (mode & S_IFMT) {
-            case S_IFREG:
-                inode->i_fop = &mc504fs_file_operations;
-                inode->i_op = &mc504fs_file_inode_operations;
-                break;
-            case S_IFDIR:
-                pr_info("Directory inode initialized\n");
-                inode->i_op = &mc504fs_dir_inode_operations;
-                inode->i_fop = &mc504fs_dir_operations;
-                inc_nlink(inode);
-                break;
-            default:
-                pr_err("mc504fs, deu merda\n");
-                return NULL;
-        }
+    inode->i_ino = get_next_ino();
+    inode_init_owner(&nop_mnt_idmap, inode, dir, mode);
+    simple_inode_init_ts(inode);
+
+    switch (mode & S_IFMT) {
+        case S_IFREG:
+            inode->i_op = &mc504fs_file_inode_operations;
+            inode->i_fop = &mc504fs_file_operations;
+            break;
+
+        case S_IFDIR:
+            inode->i_op = &mc504fs_dir_inode_operations;
+            inode->i_fop = &simple_dir_operations;
+            inc_nlink(inode);  // Contagem inicial de links do diretório (".")
+            break;
+
+        default:
+            pr_err("mc504fs: Unsupported inode type\n");
+            iput(inode);
+            return NULL;
     }
 
     return inode;
