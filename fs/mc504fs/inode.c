@@ -229,7 +229,7 @@ static struct inode *mc504fs_get_inode(struct super_block *sb, const struct inod
     switch (mode & S_IFMT) {
         case S_IFREG:
             inode->i_op = &mc504fs_file_inode_operations;
-            inode->i_fop = &simple_dir_operations;
+            inode->i_fop = &mc504fs_file_operations;
             break;
 
         case S_IFDIR:
