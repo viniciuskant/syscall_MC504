@@ -127,6 +127,7 @@
             cat /proc/filesystems
 
 */
+
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -138,28 +139,23 @@
 #include <linux/fs_context.h>
 #include <linux/ramfs.h>
 
-
-#define MC504FS_MAGIC 0x20df84ab // valor arbitrário para identificação
+#define MC504FS_MAGIC 0x20df84ab
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Vinicius");
 MODULE_DESCRIPTION("MC504FS: Basic filesystem");
 MODULE_VERSION("0.1");
 
-static struct inode *mc504fs_get_inode(struct super_block *sb, const struct inode *dir,
-                                       umode_t mode, dev_t dev);
-
+static struct inode *mc504fs_get_inode(struct super_block *sb, const struct inode *dir, umode_t mode, dev_t dev);
 static int mc504fs_create(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode, bool excl);
 static struct dentry *mc504fs_mkdir(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode);
 
-// Operações para arquivos
 static const struct file_operations mc504fs_file_operations = {
     .read_iter = generic_file_read_iter,
     .write_iter = generic_file_write_iter,
     .llseek = generic_file_llseek,
 };
 
-// Operações para diretórios
 static const struct inode_operations mc504fs_dir_operations = {
     .lookup = simple_lookup,
     .mkdir = mc504fs_mkdir,
@@ -168,11 +164,9 @@ static const struct inode_operations mc504fs_dir_operations = {
     .rename = simple_rename,
 };
 
-// Operações para inodes de arquivos
 static const struct inode_operations mc504fs_file_inode_operations = {
     .getattr = simple_getattr,
     .setattr = simple_setattr,
-    
 };
 
 static const struct super_operations mc504fs_super_ops = {
@@ -180,53 +174,33 @@ static const struct super_operations mc504fs_super_ops = {
     .drop_inode = generic_delete_inode,
 };
 
-
-// Criação genérica de inode (arquivo ou diretório)
-static int mc504fs_mknod(struct mnt_idmap *idmap, struct inode *dir,
-                         struct dentry *dentry, umode_t mode, dev_t dev) {
-    pr_info("mc504fs: mknod called (mode=0x%x) for '%s'\n", mode, dentry->d_name.name);
-
+static int mc504fs_mknod(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev) {
     struct inode *inode = mc504fs_get_inode(dir->i_sb, dir, mode, dev);
     int error = -ENOSPC;
 
     if (inode) {
         d_instantiate(dentry, inode);
         dget(dentry);
-
         error = 0;
         inode_set_ctime_current(dir);
         inode_set_mtime_to_ts(dir, inode_set_ctime_current(dir));
-
     }
 
-    pr_info("mc504fs: mknod finished with status %d for '%s'\n", error, dentry->d_name.name);
     return error;
 }
 
-// Criação de arquivos regulares
-static int mc504fs_create(struct mnt_idmap *idmap, struct inode *dir,
-                          struct dentry *dentry, umode_t mode, bool excl) {
-    pr_info("mc504fs: create called for '%s'\n", dentry->d_name.name);
+static int mc504fs_create(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode, bool excl) {
     return mc504fs_mknod(&nop_mnt_idmap, dir, dentry, mode | S_IFREG, 0);
 }
 
-// Criação de diretórios
-static struct dentry *mc504fs_mkdir(struct mnt_idmap *idmap, struct inode *dir,
-                                    struct dentry *dentry, umode_t mode) {
-    pr_info("mc504fs: mkdir called for '%s'\n", dentry->d_name.name);
-
+static struct dentry *mc504fs_mkdir(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode) {
     int retval = mc504fs_mknod(&nop_mnt_idmap, dir, dentry, mode | S_IFDIR, 0);
     if (!retval)
         inc_nlink(dir);
-
-    pr_info("mc504fs: mkdir returning %d for '%s'\n", retval, dentry->d_name.name);
-
-    return retval ? ERR_PTR(retval) : NULL; // ✅ retorno correto
+    return retval ? ERR_PTR(retval) : NULL;
 }
 
-// Alocação e configuração de inodes
-static struct inode *mc504fs_get_inode(struct super_block *sb, const struct inode *dir,
-                                       umode_t mode, dev_t dev) {
+static struct inode *mc504fs_get_inode(struct super_block *sb, const struct inode *dir, umode_t mode, dev_t dev) {
     struct inode *inode = new_inode(sb);
     if (!inode)
         return NULL;
@@ -239,17 +213,14 @@ static struct inode *mc504fs_get_inode(struct super_block *sb, const struct inod
         case S_IFREG:
             inode->i_op = &mc504fs_file_inode_operations;
             inode->i_fop = &mc504fs_file_operations;
-            inode->i_mapping->a_ops = &ram_aops;  //permite escrita em memoria
-            break; 
-
+            inode->i_mapping->a_ops = &ram_aops;
+            break;
         case S_IFDIR:
             inode->i_op = &mc504fs_dir_operations;
             inode->i_fop = &simple_dir_operations;
             inc_nlink(inode);
             break;
-
         default:
-            pr_err("mc504fs: Unsupported inode type\n");
             iput(inode);
             return NULL;
     }
@@ -257,15 +228,14 @@ static struct inode *mc504fs_get_inode(struct super_block *sb, const struct inod
     return inode;
 }
 
-// Preenchimento do super bloco
 static int mc504fs_fill_super(struct super_block *sb, void *data, int silent) {
     struct inode *inode;
 
     sb->s_magic = MC504FS_MAGIC;
     sb->s_blocksize = PAGE_SIZE;
     sb->s_blocksize_bits = PAGE_SHIFT;
-    sb->s_op = &mc504fs_super_ops;  // define operações do super bloco
-    sb->s_time_gran = 1; 
+    sb->s_op = &mc504fs_super_ops;
+    sb->s_time_gran = 1;
 
     inode = mc504fs_get_inode(sb, NULL, S_IFDIR, 0);
     if (!inode)
@@ -278,30 +248,15 @@ static int mc504fs_fill_super(struct super_block *sb, void *data, int silent) {
     return 0;
 }
 
-// Função mount
-static struct dentry *mc504fs_mount(struct file_system_type *fs_type,
-    int flags, const char *dev_name, void *data) {
-    struct dentry *ret;
-
-    pr_info("mc504fs: mounting...\n");
-
-    ret = mount_bdev(fs_type, flags, dev_name, data, mc504fs_fill_super);
-
-    if (IS_ERR(ret))
-        pr_err("mc504fs: Error mounting mc504fs\n");
-    else
-        pr_info("mc504fs: mc504fs mounted on [%s]\n", dev_name);
-
+static struct dentry *mc504fs_mount(struct file_system_type *fs_type, int flags, const char *dev_name, void *data) {
+    struct dentry *ret = mount_bdev(fs_type, flags, dev_name, data, mc504fs_fill_super);
     return ret;
 }
 
-// Função kill_sb
 static void mc504fs_kill_superblock(struct super_block *s) {
     kill_block_super(s);
-    pr_info("mc504fs: superblock destroyed\n");
 }
 
-// Estrutura file_system_type
 static struct file_system_type mc504_fs_type = {
     .owner = THIS_MODULE,
     .name = "mc504fs",
@@ -309,23 +264,12 @@ static struct file_system_type mc504_fs_type = {
     .kill_sb = mc504fs_kill_superblock,
 };
 
-// Inicialização do módulo
 static int __init mc504fs_init(void) {
-    int ret = register_filesystem(&mc504_fs_type);
-    if (ret)
-        pr_err("mc504fs: Failed to register. Error: %d\n", ret);
-    else
-        pr_info("mc504fs: Module loaded\n");
-    return ret;
+    return register_filesystem(&mc504_fs_type);
 }
 
-// Finalização do módulo
 static void __exit mc504fs_exit(void) {
-    int ret = unregister_filesystem(&mc504_fs_type);
-    if (ret)
-        pr_err("mc504fs: Failed to unregister. Error: %d\n", ret);
-    else
-        pr_info("mc504fs: Module unloaded\n");
+    unregister_filesystem(&mc504_fs_type);
 }
 
 module_init(mc504fs_init);
