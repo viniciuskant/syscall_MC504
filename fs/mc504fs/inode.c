@@ -135,6 +135,9 @@
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/dcache.h>
+#include <linux/fs_context.h>
+#include <linux/ramfs.h>
+
 
 #define MC504FS_MAGIC 0x20df84ab // valor arbitrário para identificação
 
@@ -169,6 +172,12 @@ static const struct inode_operations mc504fs_dir_operations = {
 static const struct inode_operations mc504fs_file_inode_operations = {
     .getattr = simple_getattr,
     .setattr = simple_setattr,
+    
+};
+
+static const struct super_operations mc504fs_super_ops = {
+    .statfs = simple_statfs,
+    .drop_inode = generic_delete_inode,
 };
 
 
@@ -230,7 +239,8 @@ static struct inode *mc504fs_get_inode(struct super_block *sb, const struct inod
         case S_IFREG:
             inode->i_op = &mc504fs_file_inode_operations;
             inode->i_fop = &mc504fs_file_operations;
-            break;
+            inode->i_mapping->a_ops = &ram_aops;  //permite escrita em memoria
+            break; 
 
         case S_IFDIR:
             inode->i_op = &mc504fs_dir_operations;
@@ -254,6 +264,8 @@ static int mc504fs_fill_super(struct super_block *sb, void *data, int silent) {
     sb->s_magic = MC504FS_MAGIC;
     sb->s_blocksize = PAGE_SIZE;
     sb->s_blocksize_bits = PAGE_SHIFT;
+    sb->s_op = &mc504fs_super_ops;  // define operações do super bloco
+    sb->s_time_gran = 1; 
 
     inode = mc504fs_get_inode(sb, NULL, S_IFDIR, 0);
     if (!inode)
